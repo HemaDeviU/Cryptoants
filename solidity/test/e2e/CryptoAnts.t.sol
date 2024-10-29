@@ -7,6 +7,11 @@ import {IEgg, Egg} from 'contracts/Egg.sol';
 import {TestUtils} from 'test/TestUtils.sol';
 import {console} from 'forge-std/console.sol';
 import {Vm} from 'forge-std/Vm.sol';
+import {VRFCoordinatorV2_5Mock} from "@chainlink/contracts/src/v0.8/vrf/mocks/VRFCoordinatorV2_5Mock.sol";
+import {LinkToken} from "../test/mocks/LinkToken.sol";
+import {HelperConfig} from "../../script/HelperConfig.s.sol";
+import {CodeConstants} from "../../script/HelperConfig.s.sol";
+
 
 contract E2ECryptoAnts is Test, TestUtils {
   uint256 internal constant FORK_BLOCK = 17_052_487;
@@ -20,6 +25,12 @@ contract E2ECryptoAnts is Test, TestUtils {
   uint256 public constant STARTING_USER_BALANCE = 10 ether;
   uint256 public constant EGG_PRICE = 1 ether;
   uint256 public constant COOLDOWN_PERIOD = 10 minutes;
+  uint256 public constant LINK_BALANCE = 100 ether;
+   uint256 subscriptionId;
+    bytes32 gasLane;
+    uint32 callbackGasLimit;
+    address vrfCoordinatorV2_5;
+    LinkToken link;
 
   function setUp() public {
     // string memory rpcurl = vm.envString('MAINNET_RPC');
@@ -31,6 +42,23 @@ contract E2ECryptoAnts is Test, TestUtils {
     _eggs = new Egg(address(_cryptoAnts));
     vm.deal(_user1, STARTING_USER_BALANCE);
     vm.deal(_user2, STARTING_USER_BALANCE);
+
+     HelperConfig.NetworkConfig memory config = helperConfig.getConfig();
+        subscriptionId = config.subscriptionId;
+        gasLane = config.gasLane;
+        automationUpdateInterval = config.automationUpdateInterval;
+        callbackGasLimit = config.callbackGasLimit;
+        vrfCoordinatorV2_5 = config.vrfCoordinatorV2_5;
+        link = LinkToken(config.link);
+
+        vm.startPrank(msg.sender);
+        if (block.chainid == LOCAL_CHAIN_ID) {
+            link.mint(msg.sender, LINK_BALANCE);
+            VRFCoordinatorV2_5Mock(vrfCoordinatorV2_5).fundSubscription(subscriptionId, LINK_BALANCE);
+        }
+        link.approve(vrfCoordinatorV2_5, LINK_BALANCE);
+        vm.stopPrank();
+    }
   }
 
   function testOnlyAllowCryptoAntsToMintEggs() public {
@@ -96,6 +124,7 @@ contract E2ECryptoAnts is Test, TestUtils {
       vm.warp(block.timestamp + 10 minutes);
       _cryptoAnts.createAnt();
     }
+    //todoo layeggs for each
     assertEq(_cryptoAnts.balanceOf(_user2), 100, 'User2 should have 100 ants');
     vm.stopPrank();
   }
@@ -124,5 +153,8 @@ contract E2ECryptoAnts is Test, TestUtils {
     Vm.Log[] memory entries = vm.getRecordedLogs();
     console2.logBytes32(entries[1].topics[1]);
     bytes32 requestId = entries[1].topics[1];
+    VRFCoordinatorV2_5Mock(vrfCoordinatorV2_5).fulfillRandomWords(uint256(requestId),address(_cryptoAnts));
+    //use random number from vrf to next steps and then assert
+    
   }
 }
