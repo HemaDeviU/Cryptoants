@@ -7,14 +7,17 @@ import {IEgg, Egg} from 'contracts/Egg.sol';
 
 contract Deploy is Script {
   ICryptoAnts internal _cryptoAnts;
-  address deployer;
+  address public deployer;
   IEgg internal _eggs;
+  address public governor;
 
   function run() external {
     deployer = vm.rememberKey(vm.envUint('DEPLOYER_PRIVATE_KEY'));
+    uint256 subscriptionId = vm.envUint('SUBSCRIPTION_ID');
+    governor = vm.envAddress('GOVERNOR_ADDRESS');
     vm.startBroadcast(deployer);
-    IEgg _eggs = IEgg(computeCreateAddress(deployer, 1));
-    _cryptoAnts = new CryptoAnts(address(_eggs));
+    _eggs = IEgg(computeCreateAddress(deployer, 1));
+    _cryptoAnts = new CryptoAnts(address(_eggs), subscriptionId, governor);
     _eggs = new Egg(address(_cryptoAnts));
     vm.stopBroadcast();
   }

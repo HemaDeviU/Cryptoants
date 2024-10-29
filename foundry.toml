@@ -11,13 +11,16 @@ multiline_func_header = 'params_first'
 runs = 1000
 
 [profile.default]
-solc = '0.8.16'
+solc = '0.8.20'
 src = 'solidity'
 test = 'solidity/test'
 out = 'out'
 libs = ['lib']
 optimizer_runs = 10_000
 
+
 [rpc_endpoints]
 mainnet = "${MAINNET_RPC}"
 rinkeby = "${RINKEBY_RPC}"
+[dotenv]
+path = ".env"
