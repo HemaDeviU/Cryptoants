@@ -7,6 +7,7 @@ import {IEgg, Egg} from 'contracts/Egg.sol';
 import {TestUtils} from 'test/TestUtils.sol';
 import {console} from 'forge-std/console.sol';
 import {Vm} from 'forge-std/Vm.sol';
+import {VRFCoordinatorV2_5Mock} from '@chainlink/contracts/src/v0.8/vrf/mocks/VRFCoordinatorV2_5Mock.sol';
 
 contract E2ECryptoAnts is Test, TestUtils {
   uint256 internal constant FORK_BLOCK = 17_052_487;
@@ -20,15 +21,25 @@ contract E2ECryptoAnts is Test, TestUtils {
   uint256 public constant STARTING_USER_BALANCE = 10 ether;
   uint256 public constant EGG_PRICE = 1 ether;
   uint256 public constant COOLDOWN_PERIOD = 10 minutes;
+  address vrfCoordinatorV2_5;
 
   function setUp() public {
     // string memory rpcurl = vm.envString('MAINNET_RPC');
     //vm.createSelectFork(rpcurl, FORK_BLOCK);
+    vm.startBroadcast();
+    VRFCoordinatorV2_5Mock vrfCoordinatorV2_5Mock = new VRFCoordinatorV2_5Mock(0.25 ether, 1e9, 4e15);
+    vrfCoordinatorV2_5 = address(vrfCoordinatorV2_5Mock);
+    vm.stopBroadcast();
+    vrfCoordinatorV2_5Mock.createSubscription();
+    vrfCoordinatorV2_5Mock.fundSubscription(1, 10 ether);
+
     _eggs = IEgg(addressFrom(address(this), 1));
     subscriptionId = vm.envUint('SUBSCRIPTION_ID');
     governor = vm.envAddress('GOVERNOR_ADDRESS');
-    _cryptoAnts = new CryptoAnts(address(_eggs), subscriptionId, governor);
     _eggs = new Egg(address(_cryptoAnts));
+    _cryptoAnts = new CryptoAnts(address(_eggs), subscriptionId, governor, address(vrfCoordinatorV2_5));
+    vrfCoordinatorV2_5Mock.addConsumer(subscriptionId, address(_cryptoAnts));
+    vm.stopBroadcast();
     vm.deal(_user1, STARTING_USER_BALANCE);
     vm.deal(_user2, STARTING_USER_BALANCE);
   }
@@ -95,7 +106,7 @@ contract E2ECryptoAnts is Test, TestUtils {
     while (_cryptoAnts.balanceOf(_user2) < 100) {
       vm.warp(block.timestamp + 10 minutes);
       _cryptoAnts.createAnt();
-    }
+    } //change after comp layeggs
     assertEq(_cryptoAnts.balanceOf(_user2), 100, 'User2 should have 100 ants');
     vm.stopPrank();
   }
@@ -107,13 +118,12 @@ contract E2ECryptoAnts is Test, TestUtils {
     uint256 _antId = _cryptoAnts.createAnt();
     vm.warp(block.timestamp + COOLDOWN_PERIOD);
     vm.recordLogs();
-    uint256 reqId = _cryptoAnts.layEggs(_antId);
     Vm.Log[] memory entries = vm.getRecordedLogs();
     bytes32 requestId = entries[1].topics[1];
     assert(uint256(requestId) > 0);
   }
 
-  function testFulillRandomness() public {
+  function testFulillRandomnessAntDies() public {
     vm.startPrank(_user1);
     _cryptoAnts.buyEggs{value: EGG_PRICE}(1);
     assertEq(_eggs.balanceOf(_user1), 1, 'User1 should own the eggs');
@@ -124,5 +134,35 @@ contract E2ECryptoAnts is Test, TestUtils {
     Vm.Log[] memory entries = vm.getRecordedLogs();
     console2.logBytes32(entries[1].topics[1]);
     bytes32 requestId = entries[1].topics[1];
+
+    uint256[] memory randomWords = new uint256[](2);
+    randomWords[0] = 10;
+    randomWords[1] = 3;
+    VRFCoordinatorV2_5Mock(vrfCoordinatorV2_5).fulfillRandomWordsWithOverride(reqId, address(_cryptoAnts), randomWords);
+    vm.expectRevert(CryptoAnts.CryptoAnts_AntNotAlive.selector);
+    //deadant
+    _cryptoAnts.layEggs(_antId);
+    vm.stopPrank();
+  }
+
+  function testFulillRandomnessAntLives() public {
+    vm.startPrank(_user1);
+    _cryptoAnts.buyEggs{value: EGG_PRICE}(1);
+    assertEq(_eggs.balanceOf(_user1), 1, 'User1 should own the eggs');
+    uint256 _antId = _cryptoAnts.createAnt();
+    vm.warp(block.timestamp + COOLDOWN_PERIOD);
+    vm.recordLogs();
+    uint256 reqId = _cryptoAnts.layEggs(_antId);
+    Vm.Log[] memory entries = vm.getRecordedLogs();
+    console2.logBytes32(entries[1].topics[1]);
+    bytes32 requestId = entries[1].topics[1];
+    uint256[] memory randomWords2 = new uint256[](2);
+    randomWords2[0] = 10;
+    randomWords2[1] = 8;
+    VRFCoordinatorV2_5Mock(vrfCoordinatorV2_5).fulfillRandomWordsWithOverride(reqId, address(_cryptoAnts), randomWords2);
+    _cryptoAnts.layEggs(_antId);
+    assertEq(_eggs.balanceOf(_user1), 9, 'user1 should have 5 eggs now');
+    assertTrue(_cryptoAnts.isAlive(_antId), 'Ant should still be alive');
+    vm.stopPrank();
   }
 }

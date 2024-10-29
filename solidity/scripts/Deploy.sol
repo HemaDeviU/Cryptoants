@@ -10,6 +10,7 @@ contract Deploy is Script {
   address public deployer;
   IEgg internal _eggs;
   address public governor;
+  address public vrfCoordinatorV2_5;
 
   function run() external {
     deployer = vm.rememberKey(vm.envUint('DEPLOYER_PRIVATE_KEY'));
@@ -17,7 +18,7 @@ contract Deploy is Script {
     governor = vm.envAddress('GOVERNOR_ADDRESS');
     vm.startBroadcast(deployer);
     _eggs = IEgg(computeCreateAddress(deployer, 1));
-    _cryptoAnts = new CryptoAnts(address(_eggs), subscriptionId, governor);
+    _cryptoAnts = new CryptoAnts(address(_eggs), subscriptionId, governor, vrfCoordinatorV2_5);
     _eggs = new Egg(address(_cryptoAnts));
     vm.stopBroadcast();
   }

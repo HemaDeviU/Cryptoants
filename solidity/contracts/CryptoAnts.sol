@@ -15,6 +15,7 @@ interface ICryptoAnts is IERC721 {
   function layEggs(uint256 _antId) external returns (uint256 requestId);
   function setPrice(uint256 newPrice) external;
   function getAntPrice() external view returns (uint256);
+  function isAlive(uint256 antId) external view returns (bool);
 }
 
 contract CryptoAnts is ERC721, ICryptoAnts, ERC721Pausable, VRFConsumerBaseV2Plus {
@@ -48,6 +49,7 @@ contract CryptoAnts is ERC721, ICryptoAnts, ERC721Pausable, VRFConsumerBaseV2Plu
   uint8 private immutable _I_MAX_EGGS_PER_LAY = 20;
   uint256 public deathChance = 5;
   address payable public governor;
+  address public vrfCoordinatorV2_5;
 
   mapping(uint256 => Ant) public ants;
   mapping(uint256 => uint256) public requestToAnt;
@@ -77,14 +79,16 @@ contract CryptoAnts is ERC721, ICryptoAnts, ERC721Pausable, VRFConsumerBaseV2Plu
   constructor(
     address _eggs,
     uint256 _subscriptionId,
-    address _governor
-  ) ERC721('Crypto Ants', 'ANTS') VRFConsumerBaseV2Plus(0x9DdfaCa8183c41ad55329BdeeD9F6A8d53168B1B) {
+    address _governor,
+    address _vrfCoordinatorV2_5
+  ) ERC721('Crypto Ants', 'ANTS') VRFConsumerBaseV2Plus(_vrfCoordinatorV2_5) {
     EGGS = IEgg(_eggs);
     if (_governor == address(0)) {
       revert NoZeroAddress();
     }
     subscriptionId = _subscriptionId;
     governor = payable(_governor);
+    vrfCoordinatorV2_5 = _vrfCoordinatorV2_5;
   }
 
   function buyEggs(uint256 _numberOfEggs) external payable lock {
@@ -99,11 +103,10 @@ contract CryptoAnts is ERC721, ICryptoAnts, ERC721Pausable, VRFConsumerBaseV2Plu
   function createAnt() external lock returns (uint256 _antId) {
     if (EGGS.balanceOf(msg.sender) < 1) revert CryptoAnts_NoEggs();
     _antId = ++_antIds;
-    EGGS.burnEgg(msg.sender, 1);
-
-    _safeMint(msg.sender, _antId);
     ants[_antId] = Ant({lastLayTime: block.timestamp, isAlive: true});
+    EGGS.burnEgg(msg.sender, 1);
     emit AntCreated(_antId, msg.sender);
+    _safeMint(msg.sender, _antId);
   }
 
   function sellAnt(uint256 _antId) external lock {
@@ -139,12 +142,11 @@ contract CryptoAnts is ERC721, ICryptoAnts, ERC721Pausable, VRFConsumerBaseV2Plu
         extraArgs: VRFV2PlusClient._argsToBytes(VRFV2PlusClient.ExtraArgsV1({nativePayment: false}))
       })
     );
+    ants[_antId].lastLayTime = block.timestamp;
     requestToAnt[requestId] = _antId;
     emit RandomnessRequested(requestId);
-    ants[_antId].lastLayTime = block.timestamp;
   }
 
-  //called by chainlink node
   function fulfillRandomWords(
     uint256 requestId,
     uint256[] calldata randomWords
@@ -159,10 +161,9 @@ contract CryptoAnts is ERC721, ICryptoAnts, ERC721Pausable, VRFConsumerBaseV2Plu
     }
 
     uint256 numberOfEggs = (randomWords[1] % (_I_MAX_EGGS_PER_LAY + 1));
-
     address antOwner = ownerOf(antId);
-    EGGS.mint(antOwner, numberOfEggs);
     emit EggsLayed(antOwner, numberOfEggs);
+    EGGS.mint(antOwner, numberOfEggs);
   }
 
   function setPrice(uint256 newPrice) external {
@@ -179,6 +180,10 @@ contract CryptoAnts is ERC721, ICryptoAnts, ERC721Pausable, VRFConsumerBaseV2Plu
 
   function getAntPrice() external view returns (uint256) {
     return antPrice;
+  }
+
+  function isAlive(uint256 antId) external view returns (bool) {
+    return ants[antId].isAlive;
   }
 
   function getContractBalance() public view returns (uint256) {
