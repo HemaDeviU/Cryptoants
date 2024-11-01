@@ -10,7 +10,7 @@ import {Vm} from 'forge-std/Vm.sol';
 import {VRFCoordinatorV2_5Mock} from '@chainlink/contracts/src/v0.8/vrf/mocks/VRFCoordinatorV2_5Mock.sol';
 
 contract E2ECryptoAnts is Test, TestUtils {
-  uint256 internal constant FORK_BLOCK = 17_052_487;
+  //uint256 internal constant FORK_BLOCK = 17_052_487;
   ICryptoAnts internal _cryptoAnts;
   address internal _owner = makeAddr('owner');
   address internal _user1 = makeAddr('user1');
@@ -24,7 +24,7 @@ contract E2ECryptoAnts is Test, TestUtils {
   address vrfCoordinatorV2_5;
 
   function setUp() public {
-    // string memory rpcurl = vm.envString('MAINNET_RPC');
+    //string memory rpcurl = vm.envString('MAINNET_RPC');
     //vm.createSelectFork(rpcurl, FORK_BLOCK);
     vm.startBroadcast();
     VRFCoordinatorV2_5Mock vrfCoordinatorV2_5Mock = new VRFCoordinatorV2_5Mock(0.25 ether, 1e9, 4e15);
@@ -52,13 +52,15 @@ contract E2ECryptoAnts is Test, TestUtils {
     vm.prank(_user1);
     vm.expectRevert();
     _eggs.mint(_user1, 1);
+    vm.stopPrank();
 
   }
   function testOnlyAllowCryptoAntsToMintEggs() public {
   
-     uint256 initialBalance = _eggs.balanceOf(_user1);
-      vm.prank(_user1);
+    uint256 initialBalance = _eggs.balanceOf(_user1);
+    vm.prank(_user1);
     _cryptoAnts.buyEggs{value: 1 ether}(1);
+    vm.stopPrank();
     assertEq(_eggs.balanceOf(_user1), initialBalance + 1, 'Egg should be minted by CryptoAnts contract');
   }
 
@@ -173,7 +175,9 @@ contract E2ECryptoAnts is Test, TestUtils {
     vm.stopPrank();
   }
     function testBuyEgg() public {
-        vm.prank(_cryptoAnts,_user1);
+        //vm.prank(_cryptoAnts,_user1);
+            vm.prank(_user1);
+
         _cryptoAnts.buyEggs{value: EGG_PRICE}(1);
         assertEq(_eggs.balanceOf(_user1), 1, "User should own 1 egg after purchase");
     }
