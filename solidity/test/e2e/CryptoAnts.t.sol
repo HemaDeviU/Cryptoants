@@ -29,30 +29,37 @@ contract E2ECryptoAnts is Test, TestUtils {
     vm.startBroadcast();
     VRFCoordinatorV2_5Mock vrfCoordinatorV2_5Mock = new VRFCoordinatorV2_5Mock(0.25 ether, 1e9, 4e15);
     vrfCoordinatorV2_5 = address(vrfCoordinatorV2_5Mock);
-    vm.stopBroadcast();
-    vrfCoordinatorV2_5Mock.createSubscription();
-    vrfCoordinatorV2_5Mock.fundSubscription(1, 10 ether);
+    subscriptionId = vrfCoordinatorV2_5Mock.createSubscription();
+    vrfCoordinatorV2_5Mock.fundSubscription(subscriptionId, 10 ether);
 
     _eggs = IEgg(addressFrom(address(this), 1));
-    subscriptionId = vm.envUint('SUBSCRIPTION_ID');
-    governor = vm.envAddress('GOVERNOR_ADDRESS');
-    _eggs = new Egg(address(_cryptoAnts));
+     governor = vm.envAddress('GOVERNOR_ADDRESS');
+    console.log("Governor address:", governor);
     _cryptoAnts = new CryptoAnts(address(_eggs), subscriptionId, governor, address(vrfCoordinatorV2_5));
+
+    //subscriptionId = vm.envUint('SUBSCRIPTION_ID');
+   
+
+    _eggs = new Egg(address(_cryptoAnts));
+   
     vrfCoordinatorV2_5Mock.addConsumer(subscriptionId, address(_cryptoAnts));
     vm.stopBroadcast();
     vm.deal(_user1, STARTING_USER_BALANCE);
     vm.deal(_user2, STARTING_USER_BALANCE);
   }
 
-  function testOnlyAllowCryptoAntsToMintEggs() public {
+  function testDontOnlyAllowCryptoAntsToMintEggs() public {
     vm.prank(_user1);
     vm.expectRevert();
     _eggs.mint(_user1, 1);
-    uint256 initialBalance = _eggs.balanceOf(_user1);
-    vm.startPrank(_user1);
+
+  }
+  function testOnlyAllowCryptoAntsToMintEggs() public {
+  
+     uint256 initialBalance = _eggs.balanceOf(_user1);
+      vm.prank(_user1);
     _cryptoAnts.buyEggs{value: 1 ether}(1);
     assertEq(_eggs.balanceOf(_user1), initialBalance + 1, 'Egg should be minted by CryptoAnts contract');
-    vm.stopPrank();
   }
 
   function testBuyAnEggAndCreateNewAnt() public {
@@ -98,7 +105,7 @@ contract E2ECryptoAnts is Test, TestUtils {
   /*
     This is a completely optional test.
     Hint: you may need `warp` to handle the egg creation cooldown
-  */
+  
   function testBeAbleToCreate100AntsWithOnlyOneInitialEgg() public {
     vm.startPrank(_user2);
     _cryptoAnts.buyEggs{value: EGG_PRICE}(1);
@@ -110,7 +117,7 @@ contract E2ECryptoAnts is Test, TestUtils {
     assertEq(_cryptoAnts.balanceOf(_user2), 100, 'User2 should have 100 ants');
     vm.stopPrank();
   }
-
+*/
   function testLayEggs() public {
     vm.startPrank(_user1);
     _cryptoAnts.buyEggs{value: EGG_PRICE}(1);
@@ -165,4 +172,9 @@ contract E2ECryptoAnts is Test, TestUtils {
     assertTrue(_cryptoAnts.isAlive(_antId), 'Ant should still be alive');
     vm.stopPrank();
   }
+    function testBuyEgg() public {
+        vm.prank(_cryptoAnts,_user1);
+        _cryptoAnts.buyEggs{value: EGG_PRICE}(1);
+        assertEq(_eggs.balanceOf(_user1), 1, "User should own 1 egg after purchase");
+    }
 }

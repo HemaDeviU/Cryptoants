@@ -7,6 +7,7 @@ import {IERC721} from '@openzeppelin/contracts/token/ERC721/IERC721.sol';
 import {ERC721Pausable} from '@openzeppelin/contracts/token/ERC721/extensions/ERC721Pausable.sol';
 import {VRFConsumerBaseV2Plus} from '@chainlink/contracts/src/v0.8/vrf/dev/VRFConsumerBaseV2Plus.sol';
 import {VRFV2PlusClient} from '@chainlink/contracts/src/v0.8/vrf/dev/libraries/VRFV2PlusClient.sol';
+import {console} from 'forge-std/console.sol';
 
 interface ICryptoAnts is IERC721 {
   function buyEggs(uint256 _numberOfEggs) external payable;
@@ -21,7 +22,7 @@ interface ICryptoAnts is IERC721 {
 contract CryptoAnts is ERC721, ICryptoAnts, ERC721Pausable, VRFConsumerBaseV2Plus {
   error ReentrancyGuraded();
   error CryptoAnts_NoEggs();
-  error NoZeroAddress();
+  error CryptoAnts_NoZeroAddress();
   error CryptoAnts_InCorrectAmount();
   error CryptoAnts_OnwerExists();
   error CryptoAnts_CantSellDeadAnt();
@@ -84,7 +85,7 @@ contract CryptoAnts is ERC721, ICryptoAnts, ERC721Pausable, VRFConsumerBaseV2Plu
   ) ERC721('Crypto Ants', 'ANTS') VRFConsumerBaseV2Plus(_vrfCoordinatorV2_5) {
     EGGS = IEgg(_eggs);
     if (_governor == address(0)) {
-      revert NoZeroAddress();
+      revert CryptoAnts_NoZeroAddress();
     }
     subscriptionId = _subscriptionId;
     governor = payable(_governor);
@@ -97,7 +98,9 @@ contract CryptoAnts is ERC721, ICryptoAnts, ERC721Pausable, VRFConsumerBaseV2Plu
       revert CryptoAnts_InCorrectAmount();
     }
     emit EggsBought(msg.sender, eggsCallerCanBuy);
+    console.log("log from cryptoants Minting eggs for:", msg.sender);
     EGGS.mint(msg.sender, _numberOfEggs);
+
   }
 
   function createAnt() external lock returns (uint256 _antId) {

@@ -22,5 +22,5 @@ optimizer_runs = 10_000
 [rpc_endpoints]
 mainnet = "${MAINNET_RPC}"
 rinkeby = "${RINKEBY_RPC}"
-[dotenv]
+[profile.dotenv]
 path = ".env"
