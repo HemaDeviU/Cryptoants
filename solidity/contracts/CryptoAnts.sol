@@ -135,6 +135,7 @@ contract CryptoAnts is ERC721, ICryptoAnts, ERC721Pausable, VRFConsumerBaseV2Plu
     if (!ants[_antId].isAlive) {
       revert CryptoAnts_AntNotAlive();
     }
+    
     if (block.timestamp < ants[_antId].lastLayTime + _I_COOLDOWNPERIOD) {
       revert CryptoAnts_CooldownNotComplete();
     }
@@ -150,6 +151,7 @@ contract CryptoAnts is ERC721, ICryptoAnts, ERC721Pausable, VRFConsumerBaseV2Plu
     );
     ants[_antId].lastLayTime = block.timestamp;
     requestToAnt[requestId] = _antId;
+    return requestId;
     emit RandomnessRequested(requestId);
   }
 

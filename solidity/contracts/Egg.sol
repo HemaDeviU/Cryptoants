@@ -29,16 +29,16 @@ contract Egg is ERC20, IEgg, Ownable, ERC20Pausable {
     
   }
 
-  /* modifier onlyAnts() {
+   modifier onlyAnts() {
     if (msg.sender != _I_ANTS) {
       console.log('log from Egg.sol Mint called by:', msg.sender);
     console.log('Authorized address for minting:', _I_ANTS);
       revert Egg_UnauthorizedMint();
     }
     _;
-  } */
+  } 
 
-  function mint(address _to, uint256 _amount) external  {
+  function mint(address _to, uint256 _amount) external onlyAnts {
         console.log("Mint called by:", msg.sender);
     console.log("Expected _I_ANTS:", _I_ANTS);
 

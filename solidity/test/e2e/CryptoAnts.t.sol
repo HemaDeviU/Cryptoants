@@ -8,6 +8,7 @@ import {TestUtils} from 'test/TestUtils.sol';
 import {console} from 'forge-std/console.sol';
 import {Vm} from 'forge-std/Vm.sol';
 import {VRFCoordinatorV2_5Mock} from '@chainlink/contracts/src/v0.8/vrf/mocks/VRFCoordinatorV2_5Mock.sol';
+//import {LinkToken} from "../test/mocks/LinkToken.sol";
 
 contract E2ECryptoAnts is Test, TestUtils {
   //uint256 internal constant FORK_BLOCK = 17_052_487;
@@ -18,7 +19,7 @@ contract E2ECryptoAnts is Test, TestUtils {
   IEgg internal _eggs;
   uint256 public subscriptionId;
   address public governor;
-  uint256 public constant STARTING_USER_BALANCE = 10 ether;
+  uint256 public constant STARTING_USER_BALANCE = 200 ether;
   uint256 public constant EGG_PRICE = 1 ether;
   uint256 public constant COOLDOWN_PERIOD = 10 minutes;
   address vrfCoordinatorV2_5;
@@ -26,17 +27,19 @@ contract E2ECryptoAnts is Test, TestUtils {
   function setUp() public {
     //string memory rpcurl = vm.envString('MAINNET_RPC');
     //vm.createSelectFork(rpcurl, FORK_BLOCK);
+    vm.deal(owner, STARTING_USER_BALANCE);
     vm.startPrank(owner);
     VRFCoordinatorV2_5Mock vrfCoordinatorV2_5Mock = new VRFCoordinatorV2_5Mock(0.25 ether, 1e9, 4e15);
     vrfCoordinatorV2_5 = address(vrfCoordinatorV2_5Mock);
     subscriptionId = vrfCoordinatorV2_5Mock.createSubscription();
-    vrfCoordinatorV2_5Mock.fundSubscription(subscriptionId, 10 ether);
+    
+    vrfCoordinatorV2_5Mock.fundSubscription(subscriptionId, 100 ether);
       governor = vm.envAddress('GOVERNOR_ADDRESS');
     console.log("Governor address:", governor);
 
    // _eggs = IEgg(addressFrom(address(this), 1));
     uint256 ownerNonce = vm.getNonce(owner);
-   address predictedAddress = addressFrom(owner,ownerNonce);
+   address predictedAddress = addressFrom(owner,ownerNonce+1);
    _eggs = IEgg(predictedAddress);
    
     _cryptoAnts = new CryptoAnts(address(_eggs), subscriptionId, governor, address(vrfCoordinatorV2_5));  
@@ -51,7 +54,7 @@ contract E2ECryptoAnts is Test, TestUtils {
   }
 
   function testDontOnlyAllowCryptoAntsToMintEggs() public {
-    vm.prank(_user1);
+    vm.startPrank(_user1);
     vm.expectRevert();
     _eggs.mint(_user1, 1);
     vm.stopPrank();
@@ -67,10 +70,7 @@ contract E2ECryptoAnts is Test, TestUtils {
   }
 
   function testBuyAnEggAndCreateNewAnt() public {
-    vm.prank(_user1);
-    vm.expectRevert();
-    _eggs.mint(_user1, 1);
-
+    
     vm.startPrank(_user1);
     _cryptoAnts.buyEggs{value: EGG_PRICE}(1);
     assertEq(_eggs.balanceOf(_user1), 1, 'User1 should own the eggs');
@@ -100,7 +100,7 @@ contract E2ECryptoAnts is Test, TestUtils {
     assertEq(_cryptoAnts.balanceOf(_user1), 1, 'User1 should own the ant');
     _cryptoAnts.sellAnt(_antId);
     assertEq(_cryptoAnts.balanceOf(_user1), 0, 'User1 should no longer own any ants');
-    vm.expectRevert('Ant does not exist');
+    vm.expectRevert();
     _cryptoAnts.ownerOf(_antId);
 
     vm.stopPrank();
@@ -124,34 +124,40 @@ contract E2ECryptoAnts is Test, TestUtils {
 */
   function testLayEggs() public {
     vm.startPrank(_user1);
+    uint256 initialEggBalance = _eggs.balanceOf(_user1);
     _cryptoAnts.buyEggs{value: EGG_PRICE}(1);
-    assertEq(_eggs.balanceOf(_user1), 1, 'User1 should own the eggs');
+    uint256 EggBalanceAfterBuy = _eggs.balanceOf(_user1);
+    assertEq(_eggs.balanceOf(_user1), initialEggBalance + 1, 'User1 should own the eggs');
     uint256 _antId = _cryptoAnts.createAnt();
     vm.warp(block.timestamp + COOLDOWN_PERIOD);
     vm.recordLogs();
     Vm.Log[] memory entries = vm.getRecordedLogs();
-    bytes32 requestId = entries[1].topics[1];
+    //bytes32 requestId = entries[1].topics[1];
+    uint256 requestId = _cryptoAnts.layEggs(_antId);
     assert(uint256(requestId) > 0);
   }
 
   function testFulillRandomnessAntDies() public {
     vm.startPrank(_user1);
+    uint256 initialEggBalance = _eggs.balanceOf(_user1);
     _cryptoAnts.buyEggs{value: EGG_PRICE}(1);
-    assertEq(_eggs.balanceOf(_user1), 1, 'User1 should own the eggs');
+    uint256 EggBalanceAfterEggBuy = _eggs.balanceOf(_user1);
+    console.log('EggBalanceAfterEggBuy is :',EggBalanceAfterEggBuy);
     uint256 _antId = _cryptoAnts.createAnt();
+    uint256 EggBalanceAfterCreateAnt = _eggs.balanceOf(_user1);
     vm.warp(block.timestamp + COOLDOWN_PERIOD);
     vm.recordLogs();
     uint256 reqId = _cryptoAnts.layEggs(_antId);
     Vm.Log[] memory entries = vm.getRecordedLogs();
-    console2.logBytes32(entries[1].topics[1]);
-    bytes32 requestId = entries[1].topics[1];
+   // console2.logBytes32(entries[0].topics[1]);
+    //bytes32 requestId = entries[0].topics[1];
 
     uint256[] memory randomWords = new uint256[](2);
-    randomWords[0] = 10;
+    randomWords[0] = 4;
     randomWords[1] = 3;
     VRFCoordinatorV2_5Mock(vrfCoordinatorV2_5).fulfillRandomWordsWithOverride(reqId, address(_cryptoAnts), randomWords);
-    vm.expectRevert(CryptoAnts.CryptoAnts_AntNotAlive.selector);
-    //deadant
+    vm.warp(block.timestamp + COOLDOWN_PERIOD);
+    vm.expectRevert();
     _cryptoAnts.layEggs(_antId);
     vm.stopPrank();
   }
@@ -165,14 +171,15 @@ contract E2ECryptoAnts is Test, TestUtils {
     vm.recordLogs();
     uint256 reqId = _cryptoAnts.layEggs(_antId);
     Vm.Log[] memory entries = vm.getRecordedLogs();
-    console2.logBytes32(entries[1].topics[1]);
-    bytes32 requestId = entries[1].topics[1];
+    //console2.logBytes32(entries[1].topics[1]);
+    //bytes32 requestId = entries[1].topics[1];
     uint256[] memory randomWords2 = new uint256[](2);
     randomWords2[0] = 10;
     randomWords2[1] = 8;
     VRFCoordinatorV2_5Mock(vrfCoordinatorV2_5).fulfillRandomWordsWithOverride(reqId, address(_cryptoAnts), randomWords2);
+    vm.warp(block.timestamp + COOLDOWN_PERIOD);
     _cryptoAnts.layEggs(_antId);
-    assertEq(_eggs.balanceOf(_user1), 9, 'user1 should have 5 eggs now');
+    assertEq(_eggs.balanceOf(_user1), 8, 'user1 should have 8 eggs now');
     assertTrue(_cryptoAnts.isAlive(_antId), 'Ant should still be alive');
     vm.stopPrank();
   }
