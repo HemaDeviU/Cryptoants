@@ -9,17 +9,24 @@ import {VRFConsumerBaseV2Plus} from '@chainlink/contracts/src/v0.8/vrf/dev/VRFCo
 import {VRFV2PlusClient} from '@chainlink/contracts/src/v0.8/vrf/dev/libraries/VRFV2PlusClient.sol';
 import {console} from 'forge-std/console.sol';
 
+
+
 interface ICryptoAnts is IERC721 {
   function buyEggs(uint256 _numberOfEggs) external payable;
   function createAnt() external returns (uint256 _antId);
-  function sellAnt(uint256 _antId) external;
+  function sellAnt(uint256 _antId,uint256 amount) external;
   function layEggs(uint256 _antId) external returns (uint256 requestId);
   function setPrice(uint256 newPrice) external;
   function getAntPrice() external view returns (uint256);
   function isAlive(uint256 antId) external view returns (bool);
 }
+/* @Title CryptoAnts
+@Author Hema
+@notice The contract allows users to buy eggs, create ants and use the ants to lay new eggs
+@dev Core contract of the game to manage Ants as ERC721 and functions to handle game operations*/
 
 contract CryptoAnts is ERC721, ICryptoAnts, ERC721Pausable, VRFConsumerBaseV2Plus {
+ 
   error ReentrancyGuraded();
   error CryptoAnts_NoEggs();
   error CryptoAnts_NoZeroAddress();
@@ -32,28 +39,29 @@ contract CryptoAnts is ERC721, ICryptoAnts, ERC721Pausable, VRFConsumerBaseV2Plu
   error CryptoAnts_UnauthorizedAccess();
   error CryptoAnts_IncorrectPriceStrategy();
   error CryptoAnts_NoBalance();
+  error CryptoAnts_MaxAntPriceExceeded();
 
-  uint256 public subscriptionId;
-  bytes32 public keyHash = 0x787d74caea10b2b357790d5b5247c2f63d1d91572a9846f780606e4d953677ae;
-  uint32 private immutable _I_CALLBACKGASLIMIT = 100_000;
-  uint16 private constant _REQUEST_CONFIRMATIONS = 3;
-  uint32 private constant _NUM_WORDS = 2;
+  //Chainlink State Variables hardcoded for non-production environment
+  uint256 public subscriptionId; //Chainlink Vrf subscription id
+  bytes32 public keyHash = 0x787d74caea10b2b357790d5b5247c2f63d1d91572a9846f780606e4d953677ae; //key hash for vrf,previously gaslane
+  uint32 private immutable _I_CALLBACKGASLIMIT = 100_000; //chainlink gas limit for callbacks
+  uint16 private constant _REQUEST_CONFIRMATIONS = 3;//number of confimrations required for vrf requests
+  uint32 private constant _NUM_WORDS = 2;// number of random words requested 
+  address public vrfCoordinatorV2_5;//chainlink vrf cordinator
 
-  bool public locked;
-
-  IEgg public immutable EGGS;
-  uint256 public eggPrice = 1 ether;
-  uint256 public antPrice;
-  uint256 private _antIds;
-  uint256 public immutable I_ANTSALEDISCOUNT = 60;
-  uint256 private immutable _I_COOLDOWNPERIOD = 10 minutes;
-  uint8 private immutable _I_MAX_EGGS_PER_LAY = 20;
-  uint256 public deathChance = 5;
+  bool public locked; //locked for reentrancy
+  IEgg public immutable EGGS;//Reference to Egg contract
+  uint8 private immutable _I_MAX_EGGS_PER_LAY = 20;//Maximum 
+  uint256 public eggPrice =  0.01 ether;//Price of an Egg
+  uint256 public antPrice = 4000000000000000;//Max Price of an Ant
+  uint256 private _antIds ;//Tokenid for Ants
+  uint256 public immutable I_ANTSALEDISCOUNT = 60;//antprice discount from eggprice
+  uint256 private immutable _I_COOLDOWNPERIOD = 10 minutes;//M
+  uint256 public deathChance = 5;//percent of Ants to die during laying eggs
   address payable public governor;
-  address public vrfCoordinatorV2_5;
 
-  mapping(uint256 => Ant) public ants;
-  mapping(uint256 => uint256) public requestToAnt;
+  mapping(uint256 => Ant) public ants;//Antid to Ant struct
+  mapping(uint256 => uint256) public requestToAnt;//Ant to RequestId
 
   struct Ant {
     uint256 lastLayTime;
@@ -61,7 +69,7 @@ contract CryptoAnts is ERC721, ICryptoAnts, ERC721Pausable, VRFConsumerBaseV2Plu
   }
 
   event EggsBought(address indexed buyer, uint256 indexed eggsBought);
-  event AntSold(uint256 indexed _antId);
+  event AntSold(uint256 indexed _antId, uint256 indexed amountsoldFor);
   event AntCreated(uint256 indexed antId, address indexed antOwner);
   event RandomnessRequested(uint256 indexed requestId);
   event AntDied(uint256 indexed antId);
@@ -81,7 +89,7 @@ contract CryptoAnts is ERC721, ICryptoAnts, ERC721Pausable, VRFConsumerBaseV2Plu
     address _eggs,
     uint256 _subscriptionId,
     address _governor,
-    address _vrfCoordinatorV2_5
+    address _vrfCoordinatorV2_5 
   ) ERC721('Crypto Ants', 'ANTS') VRFConsumerBaseV2Plus(_vrfCoordinatorV2_5) {
     EGGS = IEgg(_eggs);
     if (_governor == address(0)) {
@@ -91,7 +99,10 @@ contract CryptoAnts is ERC721, ICryptoAnts, ERC721Pausable, VRFConsumerBaseV2Plu
     governor = payable(_governor);
     vrfCoordinatorV2_5 = _vrfCoordinatorV2_5;
   }
-
+/*@notice Allows the users to buy specific number of eggs by paying with ether
+@param _numberOfEggs The number of eggs to purchase
+@dev requires the msg.value to match the total price for the eggs being bought
+*/
   function buyEggs(uint256 _numberOfEggs) external payable lock {
      uint256 eggsCallerCanBuy = eggPrice * _numberOfEggs;
     if (msg.value != eggsCallerCanBuy) {
@@ -100,11 +111,12 @@ contract CryptoAnts is ERC721, ICryptoAnts, ERC721Pausable, VRFConsumerBaseV2Plu
     emit EggsBought(msg.sender, eggsCallerCanBuy);
     console.log("log from cryptoants Minting eggs for:", msg.sender);
     EGGS.mint(msg.sender, _numberOfEggs); 
-
-
   
 }
-
+/*@notice Creates one new ant for the caller by utilizing one egg
+@return _antId The Id of the newly created ant.
+@dev Requires the caller to have atleast one egg
+*/
 
   function createAnt() external lock returns (uint256 _antId) {
     if (EGGS.balanceOf(msg.sender) < 1) revert CryptoAnts_NoEggs();
@@ -114,20 +126,33 @@ contract CryptoAnts is ERC721, ICryptoAnts, ERC721Pausable, VRFConsumerBaseV2Plu
     emit AntCreated(_antId, msg.sender);
     _safeMint(msg.sender, _antId);
   }
+/*@notice Sells the specific Ant to the contract for its price
+@param _antId Id of the ant to sell
+@dev requires that msg.sender is owner of the ant & ant is alive.The bought egg is burned by the contract
+*/
 
-  function sellAnt(uint256 _antId) external lock {
+  function sellAnt(uint256 _antId,uint256 amount) external lock {
     if (ownerOf(_antId) != msg.sender) {
       revert CryptoAnts_InvalidAntOwner();
     }
     if (!ants[_antId].isAlive) {
       revert CryptoAnts_CantSellDeadAnt();
     }
+    if(amount > antPrice)
+    {
+      revert CryptoAnts_MaxAntPriceExceeded();
+    }
     _burn(_antId);
-    emit AntSold(_antId);
-    (bool success,) = payable(msg.sender).call{value: antPrice}('');
+    emit AntSold(_antId,amount);
+    (bool success,) = payable(msg.sender).call{value: amount}('');
     require(success, 'Whoops, this call failed!');
   }
 
+/*@notice Lays a number of eggs from a specific ant, randomly after a cooldown period. Ants may die during the process.
+@param _antId The id of the ant that will lay eggs
+@return the id of randomness request made to chainlink vrf
+@requires msg.sender to own the ant after cooldown period & ant to be alive.
+*/
   function layEggs(uint256 _antId) external returns (uint256 requestId) {
     if (ownerOf(_antId) != msg.sender) {
       revert CryptoAnts_InvalidAntOwner();
@@ -151,10 +176,15 @@ contract CryptoAnts is ERC721, ICryptoAnts, ERC721Pausable, VRFConsumerBaseV2Plu
     );
     ants[_antId].lastLayTime = block.timestamp;
     requestToAnt[requestId] = _antId;
-    return requestId;
     emit RandomnessRequested(requestId);
+    return requestId;
+    
   }
-
+/* @notice callback function from chainlink that receives the random words for processing the egglay randomness
+@param requestId the id of the randomness request from layEggs function
+@param randomwords an array of random numbers returned by chainlink
+@dev determines if an ant diees or survives to mint eggs based on randomwords
+*/
   function fulfillRandomWords(
     uint256 requestId,
     uint256[] calldata randomWords
@@ -174,6 +204,9 @@ contract CryptoAnts is ERC721, ICryptoAnts, ERC721Pausable, VRFConsumerBaseV2Plu
     EGGS.mint(antOwner, numberOfEggs);
   }
 
+/*@notice sets a new price for eggs and thereby for ants
+@param newPrice is the new price of eggs
+@dev only callable by governor*/
   function setPrice(uint256 newPrice) external {
     if (msg.sender != governor) {
       revert CryptoAnts_UnauthorizedAccess();
@@ -201,7 +234,8 @@ contract CryptoAnts is ERC721, ICryptoAnts, ERC721Pausable, VRFConsumerBaseV2Plu
   function getAntsCreated() public view returns (uint256) {
     return _antIds;
   }
-
+/*@notice allows the governor to withdraw the balance of the contract
+@dev only calleable by governor*/
   function withdraw() public {
     if (msg.sender != governor) {
       revert CryptoAnts_UnauthorizedAccess();
@@ -223,13 +257,13 @@ contract CryptoAnts is ERC721, ICryptoAnts, ERC721Pausable, VRFConsumerBaseV2Plu
     _unpause();
   }
 
-  // The following functions are overrides required by Solidity.
+ function _update(address to, uint256 tokenId, address auth)
+        internal
+        override(ERC721,ERC721Pausable)
+        returns (address)
+    {
+        return super._update(to, tokenId, auth);
+    }
 
-  function _update(
-    address to,
-    uint256 tokenId,
-    address auth
-  ) internal override(ERC721, ERC721Pausable) returns (address) {
-    return super._update(to, tokenId, auth);
-  }
+   
 }

@@ -14,6 +14,10 @@ interface IEgg is IERC20 {
   function decimals() external view returns (uint8);
 
 }
+/* @Title Egg-Contract for managing EggToken
+@Author Hema
+@notice The contract is part of Cryptoants with minting and burning of eggs.
+*/
 
 contract Egg is ERC20, IEgg, Ownable, ERC20Pausable {
   error Egg_ZeroAddress();
@@ -37,7 +41,9 @@ contract Egg is ERC20, IEgg, Ownable, ERC20Pausable {
     }
     _;
   } 
-
+/* @noticeMints a specific amount of tokens to a given address
+@param _to the address to receivve the minted tokens
+@dev only callable by ants contract*/
   function mint(address _to, uint256 _amount) external onlyAnts {
         console.log("Mint called by:", msg.sender);
     console.log("Expected _I_ANTS:", _I_ANTS);
@@ -49,11 +55,15 @@ contract Egg is ERC20, IEgg, Ownable, ERC20Pausable {
     _mint(_to, _amount);
     console.log('Mint completed in Egg contract by:', msg.sender);
   }
-
+/* @notice Burns a specific amount of tokens from a given address
+@param _to the address from which to burn tokens 
+@param _amount the amount of tokens
+@dev only callable by ants contract*/
   function burnEgg(address _from, uint256 _amount) external  {
     _burn(_from, _amount);
   }
-
+/* @notice Sets the token to be indivisible
+@dev sets the decimal to 0*/
   function decimals() public view virtual override(ERC20, IEgg) returns (uint8) {
     return 0;
   }

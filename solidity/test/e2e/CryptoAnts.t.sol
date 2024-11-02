@@ -20,7 +20,7 @@ contract E2ECryptoAnts is Test, TestUtils {
   uint256 public subscriptionId;
   address public governor;
   uint256 public constant STARTING_USER_BALANCE = 200 ether;
-  uint256 public constant EGG_PRICE = 1 ether;
+  uint256 public constant EGG_PRICE = 0.01 ether;
   uint256 public constant COOLDOWN_PERIOD = 10 minutes;
   address vrfCoordinatorV2_5;
 
@@ -64,7 +64,7 @@ contract E2ECryptoAnts is Test, TestUtils {
 
     uint256 initialBalance = _eggs.balanceOf(_user1);
     vm.prank(_user1);
-    _cryptoAnts.buyEggs{value: 1 ether}(1);
+    _cryptoAnts.buyEggs{value: EGG_PRICE}(1);
    // vm.stopPrank();
     assertEq(_eggs.balanceOf(_user1), initialBalance + 1, 'Egg should be minted by CryptoAnts contract');
   }
@@ -87,8 +87,8 @@ contract E2ECryptoAnts is Test, TestUtils {
     uint256 _antId = _cryptoAnts.createAnt();
     assertEq(_cryptoAnts.balanceOf(_user1), 1, 'User should own the ant');
     uint256 initialUserBalance = _user1.balance;
-    _cryptoAnts.sellAnt(_antId);
-    assertEq(_user1.balance, initialUserBalance + _cryptoAnts.getAntPrice(), 'User1 should receive the ant sale price');
+    _cryptoAnts.sellAnt(_antId,3000000000000000);
+    assertEq(_user1.balance, initialUserBalance + 3000000000000000, 'User1 should receive the ant sale price');
     vm.stopPrank();
   }
 
@@ -98,7 +98,7 @@ contract E2ECryptoAnts is Test, TestUtils {
     assertEq(_eggs.balanceOf(_user1), 1, 'User1 should own the eggs');
     uint256 _antId = _cryptoAnts.createAnt();
     assertEq(_cryptoAnts.balanceOf(_user1), 1, 'User1 should own the ant');
-    _cryptoAnts.sellAnt(_antId);
+    _cryptoAnts.sellAnt(_antId,4000000000000000);
     assertEq(_cryptoAnts.balanceOf(_user1), 0, 'User1 should no longer own any ants');
     vm.expectRevert();
     _cryptoAnts.ownerOf(_antId);
@@ -111,17 +111,25 @@ contract E2ECryptoAnts is Test, TestUtils {
     Hint: you may need `warp` to handle the egg creation cooldown
   
   function testBeAbleToCreate100AntsWithOnlyOneInitialEgg() public {
-    vm.startPrank(_user2);
+    address _user4 = makeAddr('user4');
+    vm.startPrank(_user4);
     _cryptoAnts.buyEggs{value: EGG_PRICE}(1);
+    vm.warp(block.timestamp + 10 minutes);
     _cryptoAnts.createAnt();
-    while (_cryptoAnts.balanceOf(_user2) < 100) {
+    while (_cryptoAnts.balanceOf(_user4) < 100) {
+      uint256 currentAntBal = _cryptoAnts.balanceOf(_user4);
+      for(uint i=0; i< currentAntBal; i++)
+      {
+      _cryptoAnts.layEggs(_antId); //retriv?
       vm.warp(block.timestamp + 10 minutes);
       _cryptoAnts.createAnt();
-    } //change after comp layeggs
-    assertEq(_cryptoAnts.balanceOf(_user2), 100, 'User2 should have 100 ants');
+    } 
+    }
+    assertEq(_cryptoAnts.balanceOf(_user4), 100, 'User4 should have 100 ants');
     vm.stopPrank();
-  }
-*/
+  } */
+
+
   function testLayEggs() public {
     vm.startPrank(_user1);
     uint256 initialEggBalance = _eggs.balanceOf(_user1);
