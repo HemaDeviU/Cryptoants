@@ -12,6 +12,7 @@ interface IEgg is IERC20 {
   function mint(address, uint256) external;
   function burnEgg(address, uint256) external;
   function decimals() external view returns (uint8);
+
 }
 
 contract Egg is ERC20, IEgg, Ownable, ERC20Pausable {
@@ -19,28 +20,27 @@ contract Egg is ERC20, IEgg, Ownable, ERC20Pausable {
   error Egg_UnauthorizedMint();
   error Egg_IncorrectAmount();
 
-  address private  _I_ANTS;
+  address public _I_ANTS;
 
-  constructor(address __ants) ERC20('Egg', 'EGG') Ownable(msg.sender) {
-    /* if (__ants == address(0)) {
-      revert Egg_ZeroAddress();
-    } */
+  constructor(address __ants) ERC20('Egg', 'EGG') Ownable(__ants) {
+   
     _I_ANTS = __ants;
-    console.log('_ANTS assignment in constructor:', _I_ANTS);
+    console.log('I_ANTS assignment in constructor:', _I_ANTS);
+    
   }
 
-  modifier onlyAnts() {
+  /* modifier onlyAnts() {
     if (msg.sender != _I_ANTS) {
       console.log('log from Egg.sol Mint called by:', msg.sender);
     console.log('Authorized address for minting:', _I_ANTS);
       revert Egg_UnauthorizedMint();
     }
     _;
-  }
+  } */
 
-  function mint(address _to, uint256 _amount) external override onlyAnts {
-    //solhint-disable-next-line
-    console.log('Mint attempted in Egg contract by:', msg.sender);
+  function mint(address _to, uint256 _amount) external  {
+        console.log("Mint called by:", msg.sender);
+    console.log("Expected _I_ANTS:", _I_ANTS);
 
     if (_amount == 0) {
       revert Egg_IncorrectAmount();
@@ -50,7 +50,7 @@ contract Egg is ERC20, IEgg, Ownable, ERC20Pausable {
     console.log('Mint completed in Egg contract by:', msg.sender);
   }
 
-  function burnEgg(address _from, uint256 _amount) external onlyAnts {
+  function burnEgg(address _from, uint256 _amount) external  {
     _burn(_from, _amount);
   }
 
@@ -65,10 +65,17 @@ contract Egg is ERC20, IEgg, Ownable, ERC20Pausable {
   function unpause() public onlyOwner {
     _unpause();
   }
+ 
 
   // The following functions are overrides required by Solidity.
 
   function _update(address from, address to, uint256 value) internal override(ERC20, ERC20Pausable) {
     super._update(from, to, value);
   }
+  function I_ANTS() public view returns(address)
+  {
+    return _I_ANTS;
+  }
+  
+  
 }

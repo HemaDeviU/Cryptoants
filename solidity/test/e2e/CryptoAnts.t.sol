@@ -12,7 +12,7 @@ import {VRFCoordinatorV2_5Mock} from '@chainlink/contracts/src/v0.8/vrf/mocks/VR
 contract E2ECryptoAnts is Test, TestUtils {
   //uint256 internal constant FORK_BLOCK = 17_052_487;
   ICryptoAnts internal _cryptoAnts;
-  address internal _owner = makeAddr('owner');
+  address internal owner = makeAddr('owner');
   address internal _user1 = makeAddr('user1');
   address internal _user2 = makeAddr('user2');
   IEgg internal _eggs;
@@ -26,24 +26,26 @@ contract E2ECryptoAnts is Test, TestUtils {
   function setUp() public {
     //string memory rpcurl = vm.envString('MAINNET_RPC');
     //vm.createSelectFork(rpcurl, FORK_BLOCK);
-    vm.startBroadcast();
+    vm.startPrank(owner);
     VRFCoordinatorV2_5Mock vrfCoordinatorV2_5Mock = new VRFCoordinatorV2_5Mock(0.25 ether, 1e9, 4e15);
     vrfCoordinatorV2_5 = address(vrfCoordinatorV2_5Mock);
     subscriptionId = vrfCoordinatorV2_5Mock.createSubscription();
     vrfCoordinatorV2_5Mock.fundSubscription(subscriptionId, 10 ether);
-
-    _eggs = IEgg(addressFrom(address(this), 1));
-     governor = vm.envAddress('GOVERNOR_ADDRESS');
+      governor = vm.envAddress('GOVERNOR_ADDRESS');
     console.log("Governor address:", governor);
-    _cryptoAnts = new CryptoAnts(address(_eggs), subscriptionId, governor, address(vrfCoordinatorV2_5));
 
-    //subscriptionId = vm.envUint('SUBSCRIPTION_ID');
+   // _eggs = IEgg(addressFrom(address(this), 1));
+    uint256 ownerNonce = vm.getNonce(owner);
+   address predictedAddress = addressFrom(owner,ownerNonce);
+   _eggs = IEgg(predictedAddress);
    
-
+    _cryptoAnts = new CryptoAnts(address(_eggs), subscriptionId, governor, address(vrfCoordinatorV2_5));  
     _eggs = new Egg(address(_cryptoAnts));
+
    
     vrfCoordinatorV2_5Mock.addConsumer(subscriptionId, address(_cryptoAnts));
-    vm.stopBroadcast();
+    assertEq(address(_eggs),predictedAddress);
+    vm.stopPrank();
     vm.deal(_user1, STARTING_USER_BALANCE);
     vm.deal(_user2, STARTING_USER_BALANCE);
   }
@@ -56,11 +58,11 @@ contract E2ECryptoAnts is Test, TestUtils {
 
   }
   function testOnlyAllowCryptoAntsToMintEggs() public {
-  
+
     uint256 initialBalance = _eggs.balanceOf(_user1);
     vm.prank(_user1);
     _cryptoAnts.buyEggs{value: 1 ether}(1);
-    vm.stopPrank();
+   // vm.stopPrank();
     assertEq(_eggs.balanceOf(_user1), initialBalance + 1, 'Egg should be minted by CryptoAnts contract');
   }
 

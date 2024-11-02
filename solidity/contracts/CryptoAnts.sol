@@ -93,15 +93,18 @@ contract CryptoAnts is ERC721, ICryptoAnts, ERC721Pausable, VRFConsumerBaseV2Plu
   }
 
   function buyEggs(uint256 _numberOfEggs) external payable lock {
-    uint256 eggsCallerCanBuy = eggPrice * _numberOfEggs;
+     uint256 eggsCallerCanBuy = eggPrice * _numberOfEggs;
     if (msg.value != eggsCallerCanBuy) {
       revert CryptoAnts_InCorrectAmount();
     }
     emit EggsBought(msg.sender, eggsCallerCanBuy);
     console.log("log from cryptoants Minting eggs for:", msg.sender);
-    EGGS.mint(msg.sender, _numberOfEggs);
+    EGGS.mint(msg.sender, _numberOfEggs); 
 
-  }
+
+  
+}
+
 
   function createAnt() external lock returns (uint256 _antId) {
     if (EGGS.balanceOf(msg.sender) < 1) revert CryptoAnts_NoEggs();

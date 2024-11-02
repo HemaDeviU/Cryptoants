@@ -28,7 +28,6 @@ contract Deploy is Script {
     _cryptoAnts = new CryptoAnts(address(_eggs), subscriptionId, governor, vrfCoordinatorV2_5);
 
     _eggs = new Egg(address(_cryptoAnts));
-
     vm.stopBroadcast();
   }
 }
