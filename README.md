@@ -1,5 +1,9 @@
 # DeFi Wonderland Challenge
 
+CryptoAnts Deployed on Sepolia : https://sepolia.etherscan.io/address/0x072E2a04a6d93D61aDE3030468157a526EAcD3c5
+
+Eggs contract deployed on Sepolia : https://sepolia.etherscan.io/address/0x88870D4C432186E036C90Ab8E863c466A59120Fd
+
 Ooooh no! Robert, our lead developer, had an urgent flight and left us with an unfinished game.
 
 Hey you, yes **YOU**, are you a developer?! Do you know some Solidity? Could you please help us finish this game?
@@ -62,6 +66,7 @@ Here's a brief guide as to how run this repo.
 
 First, you make sure you have [foundry](https://github.com/foundry-rs/foundry) on your machine.
 Then clone the repo and run:
+
 ```
 yarn install
 ```
