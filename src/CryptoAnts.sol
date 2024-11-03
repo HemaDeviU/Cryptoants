@@ -1,7 +1,7 @@
 //SPDX-License-Identifier: Unlicense
 pragma solidity 0.8.20;
 
-import {IEgg} from 'contracts/Egg.sol';
+import {IEgg} from './Egg.sol';
 import {ERC721} from '@openzeppelin/contracts/token/ERC721/ERC721.sol';
 import {IERC721} from '@openzeppelin/contracts/token/ERC721/IERC721.sol';
 import {ERC721Pausable} from '@openzeppelin/contracts/token/ERC721/extensions/ERC721Pausable.sol';

@@ -2,8 +2,8 @@ pragma solidity 0.8.20;
 
 import {Test, console2} from 'forge-std/Test.sol';
 import {Vm} from 'forge-std/Vm.sol';
-import {Egg} from 'solidity/contracts/Egg.sol';
-contract EggTest is Test {
+import {Egg} from '../src/Egg.sol';
+contract TestEgg is Test {
     Egg public egg;
     address public owner;
     address public user1;

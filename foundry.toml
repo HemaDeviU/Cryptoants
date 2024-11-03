@@ -12,8 +12,8 @@ runs = 1000
 
 [profile.default]
 solc = '0.8.20'
-src = 'solidity'
-test = 'solidity/test'
+src = 'src'
+test = 'test'
 out = 'out'
 libs = ['lib']
 optimizer_runs = 10_000
